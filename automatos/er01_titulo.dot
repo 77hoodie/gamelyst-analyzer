@@ -1,0 +1,17 @@
+digraph "ER-01 — Título" {
+	fontsize=18 label="ER-01 — Título" labelloc=t rankdir=LR
+	node [fontname=Arial]
+	edge [fontname=Arial]
+	inicio [label="" shape=point]
+	q0 [label=q0]
+	q1 [label=q1 shape=doublecircle]
+	q2 [label=q2]
+	qf [label=qf shape=doublecircle]
+	inicio -> q0
+	q0 -> q1 [label=B]
+	q1 -> q2 [label="ε"]
+	q2 -> q2 [label=A]
+	q2 -> qf [label=X]
+	node [shape=note]
+	legenda [label="B = L ∪ D\nP = { :, -, ', !, ?, ., ,, &, (, ) }\nE = { espaço }\nA = B ∪ P ∪ E\nX = B ∪ P\nCada rótulo de conjunto abrevia transições unitárias, uma por símbolo."]
+}

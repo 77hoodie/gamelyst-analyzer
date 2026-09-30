@@ -1,0 +1,23 @@
+digraph "ER-03 — Ano" {
+	fontsize=18 label="ER-03 — Ano" labelloc=t rankdir=LR
+	node [fontname=Arial]
+	edge [fontname=Arial]
+	inicio [label="" shape=point]
+	q0 [label=q0]
+	qf [label=qf shape=doublecircle]
+	inicio -> q0
+	q0 -> a0 [label="ε"]
+	a0 -> a1 [label=1]
+	a1 -> a2 [label=9]
+	a2 -> a3 [label="5,6,7,8,9"]
+	a3 -> a4 [label="0,1,2,3,4,5,6,7,8,9"]
+	a4 -> qf [label="ε"]
+	q0 -> b0 [label="ε"]
+	b0 -> b1 [label=2]
+	b1 -> b2 [label=0]
+	b2 -> b3 [label="0,1,2"]
+	b3 -> b4 [label="0,1,2,3,4,5,6,7,8,9"]
+	b4 -> qf [label="ε"]
+	node [shape=note]
+	legenda [label="Rótulos separados por vírgula representam transições unitárias alternativas."]
+}

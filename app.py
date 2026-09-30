@@ -1,162 +1,202 @@
-import os
-import re
+"""Interface Streamlit do Gamelyst Analyzer."""
+
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
-import graphviz
 
-#Dicionário de Expressões Regulares com suporte a acentos Unicode (\u00C0-\u00FF, exceto "×" e "÷")
+from automata import AUTOMATA_BUILDERS, get_automaton
+from catalog_stats import calcular_resumo
+from parser import processar_texto
+from patterns import PATTERNS, PATTERN_IDS, PATTERN_NAMES
 
-PATTERNS = {
-    "TITULO": r"^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF][a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\ \:\-\'\!]*$",
-    "PLATAFORMA": r"^(PC|PS1|PS2|PS3|PS4|PS5|Xbox One|Xbox Series X/S|Nintendo Switch|Android|iOS)$",
-    "ANO": r"^(19[5-9]\d|20[0-2]\d)$",
-    "GENERO": r"^(RPG|Ação|Aventura|Estratégia|Esportes|Simulação|Terror|Puzzle|Luta)$",
-    "NOTA": r"^(10(\.0)?|[0-9](\.[0-9])?)\/10$"
-}
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+DOCS_FILE = BASE_DIR / "docs" / "expressoes_regulares.md"
 
-st.set_page_config(page_title="GameCatalog Parser", page_icon="🎮", layout="wide")
+st.set_page_config(page_title="Gamelyst Analyzer", layout="wide")
 
-st.title("GameCatalog Lexer & Parser")
-st.markdown("Validação léxica de catálogo de jogos via Expressões Regulares.")
+st.title("Gamelyst Analyzer")
+st.caption("Análise léxica e estruturação de catálogos de jogos com Expressões Regulares e AFNε.")
 
-tab_app, tab_afn, tab_docs = st.tabs(["Processador de Dados", "Diagramas AFN-ε (Graphviz)", "Fichas das Expressões"])
 
-def validar_campo(valor: str, chave: str) -> bool:
-    if not valor:
-        return False
-    return bool(re.fullmatch(PATTERNS[chave], valor.strip()))
+def carregar_exemplo(nome: str) -> str:
+    path = DATA_DIR / nome
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")
 
-def processar_linhas(linhas):
-    validos = []
-    invalidos = []
 
-    for idx, linha in enumerate(linhas, start=1):
-        linha_limpa = linha.strip()
-        if not linha_limpa:
-            continue
+def dataframe_validos(registros: list[dict]) -> pd.DataFrame:
+    if not registros:
+        return pd.DataFrame(columns=["Linha", "Título", "Plataforma", "Ano", "Gênero", "Nota", "Nota numérica"])
+    return pd.DataFrame(registros)
 
-        partes = [p.strip() for p in linha_limpa.split("|")]
-        if len(partes) != 5:
-            invalidos.append({
-                "Linha": idx, 
-                "Conteúdo": linha_limpa, 
-                "Motivo": f"Esperados 5 campos separados por '|', encontrados {len(partes)}"
-            })
-            continue
 
-        titulo, plataforma, ano, genero, nota = partes
-        erros = []
+def dataframe_invalidos(registros: list[dict]) -> pd.DataFrame:
+    if not registros:
+        return pd.DataFrame(columns=["Linha", "Conteúdo", "Campos inválidos", "Detalhes"])
+    return pd.DataFrame(registros)
 
-        if not validar_campo(titulo, "TITULO"): erros.append("Título Inválido")
-        if not validar_campo(plataforma, "PLATAFORMA"): erros.append("Plataforma Inválida")
-        if not validar_campo(ano, "ANO"): erros.append("Ano Out-of-Range (1950-2029)")
-        if not validar_campo(genero, "GENERO"): erros.append("Gênero Não Cadastrado")
-        if not validar_campo(nota, "NOTA"): erros.append("Nota Inválida (esperado 0-10/10)")
 
-        if erros:
-            invalidos.append({
-                "Linha": idx,
-                "Conteúdo": linha_limpa,
-                "Motivo": ", ".join(erros)
-            })
-        else:
-            validos.append({
-                "Linha": idx,
-                "Título": titulo,
-                "Plataforma": plataforma,
-                "Ano": int(ano),
-                "Gênero": genero,
-                "Nota": nota
-            })
-
-    return pd.DataFrame(validos), pd.DataFrame(invalidos)
+tab_app, tab_afn, tab_docs = st.tabs(["Analisador", "AFNε", "Expressões Regulares"])
 
 with tab_app:
-    st.sidebar.header("Entrada de Dados")
-    opcao_entrada = st.sidebar.radio(
-        "Selecione a fonte de dados:", 
-        ["Carregar de data/ (Arquivos de Exemplo)", "Upload de Arquivo .txt", "Digitação Manual"]
-    )
+    st.subheader("Entrada")
+    col_origem, col_formato = st.columns([1, 2])
+
+    with col_origem:
+        origem = st.radio(
+            "Fonte dos dados",
+            ["Exemplo", "Arquivo .txt", "Digitação manual"],
+            horizontal=False,
+        )
+
+    with col_formato:
+        st.markdown("**Formato de cada linha**")
+        st.code("Título | Plataforma | Ano | Gênero | Nota", language="text")
+        st.caption("Exemplo: Hades | PC | 2020 | Roguelike | 9.5/10")
 
     dados_entrada = ""
 
-    if opcao_entrada == "Carregar de data/ (Arquivos de Exemplo)":
-        arquivo_sel = st.sidebar.selectbox("Escolha o arquivo:", ["data/jogos_validos.txt", "data/jogos_invalidos.txt", "Ambos (Todos os 7 Jogos)"],index=2)
-        
-        conteudos = []
-        if arquivo_sel in ["data/jogos_validos.txt", "Ambos (Todos os 7 Jogos)"] and os.path.exists("data/jogos_validos.txt"):
-            with open("data/jogos_validos.txt", "r", encoding="utf-8") as f:
-                conteudos.append(f.read())
-                
-        if arquivo_sel in ["data/jogos_invalidos.txt", "Ambos (Todos os 7 Jogos)"] and os.path.exists("data/jogos_invalidos.txt"):
-            with open("data/jogos_invalidos.txt", "r", encoding="utf-8") as f:
-                conteudos.append(f.read())
+    if origem == "Exemplo":
+        exemplo = st.selectbox(
+            "Conjunto de exemplo",
+            [
+                "catalogo_demo.txt",
+                "jogos_validos.txt",
+                "jogos_invalidos.txt",
+            ],
+        )
+        dados_entrada = carregar_exemplo(exemplo)
+        st.text_area("Conteúdo carregado", value=dados_entrada, height=220, disabled=True)
 
-        dados_entrada = "\n".join(conteudos)
+    elif origem == "Arquivo .txt":
+        uploaded_file = st.file_uploader("Arquivo de texto", type=["txt"])
+        if uploaded_file is not None:
+            try:
+                dados_entrada = uploaded_file.getvalue().decode("utf-8")
+                st.text_area("Pré-visualização", value=dados_entrada, height=220, disabled=True)
+            except UnicodeDecodeError:
+                st.error("O arquivo não pôde ser lido como UTF-8.")
 
-    elif opcao_entrada == "Upload de Arquivo .txt":
-        uploaded_file = st.sidebar.file_uploader("Envie seu arquivo .txt", type=["txt"])
-        if uploaded_file:
-            dados_entrada = uploaded_file.getvalue().decode("utf-8")
     else:
-        dados_entrada = st.sidebar.text_area("Cole os dados no formato:\nTítulo | Plataforma | Ano | Gênero | Nota/10", height=200)
+        dados_entrada = st.text_area(
+            "Catálogo",
+            placeholder="Hades | PC | 2020 | Roguelike | 9.5/10",
+            height=220,
+        )
 
-    if dados_entrada:
-        linhas = dados_entrada.split("\n")
-        df_validos, df_invalidos = processar_linhas(linhas)
+    st.divider()
 
-        col1, col2, col3 = st.columns(3)
-        total = len(df_validos) + len(df_invalidos)
-        col1.metric("Total de Linhas Analisadas", total)
-        col2.metric("Registros Válidos", len(df_validos))
-        col3.metric("Registros Inválidos", len(df_invalidos))
+    if not dados_entrada or not dados_entrada.strip():
+        st.info("Nenhum registro disponível para análise.")
+    else:
+        validos, invalidos = processar_texto(dados_entrada)
+        df_validos = dataframe_validos(validos)
+        df_invalidos = dataframe_invalidos(invalidos)
+        resumo = calcular_resumo(validos)
 
-        st.divider()
+        total = len(validos) + len(invalidos)
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Linhas analisadas", total)
+        m2.metric("Registros válidos", len(validos))
+        m3.metric("Registros inválidos", len(invalidos))
+        m4.metric(
+            "Média das notas",
+            "—" if resumo["media_notas"] is None else f"{resumo['media_notas']:.2f}/10",
+        )
 
-        if not df_validos.empty:
-            st.subheader("Catálogo de Jogos Reconhecidos")
-            st.dataframe(df_validos, use_container_width=True)
+        if validos:
+            st.subheader("Resumo")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(
+                    f"**Mais antigo(s):** {', '.join(resumo['mais_antigos'])} ({resumo['ano_minimo']})"
+                )
+                st.markdown(
+                    f"**Mais recente(s):** {', '.join(resumo['mais_recentes'])} ({resumo['ano_maximo']})"
+                )
+            with c2:
+                contagem_plataforma = pd.DataFrame(
+                    list(resumo["por_plataforma"].items()),
+                    columns=["Plataforma", "Quantidade"],
+                )
+                st.dataframe(contagem_plataforma, use_container_width=True, hide_index=True)
 
-        if not df_invalidos.empty:
-            st.subheader("Registros Corrompidos / Rejeitados")
-            st.dataframe(df_invalidos, use_container_width=True)
+            st.subheader("Filtros")
+            plataformas = sorted(df_validos["Plataforma"].unique().tolist())
+            generos = sorted(df_validos["Gênero"].unique().tolist())
+            ano_min = int(df_validos["Ano"].min())
+            ano_max = int(df_validos["Ano"].max())
+
+            f1, f2, f3, f4 = st.columns(4)
+            plataforma_filtro = f1.selectbox("Plataforma", ["Todas"] + plataformas)
+            genero_filtro = f2.selectbox("Gênero", ["Todos"] + generos)
+            intervalo_ano = f3.slider("Ano", 1950, 2029, (ano_min, ano_max))
+            nota_minima = f4.slider("Nota mínima", 0.0, 10.0, 0.0, 0.1)
+
+            filtrado = df_validos.copy()
+            if plataforma_filtro != "Todas":
+                filtrado = filtrado[filtrado["Plataforma"] == plataforma_filtro]
+            if genero_filtro != "Todos":
+                filtrado = filtrado[filtrado["Gênero"] == genero_filtro]
+            filtrado = filtrado[
+                (filtrado["Ano"] >= intervalo_ano[0])
+                & (filtrado["Ano"] <= intervalo_ano[1])
+                & (filtrado["Nota numérica"] >= nota_minima)
+            ]
+
+            st.subheader("Registros reconhecidos")
+            st.dataframe(
+                filtrado.drop(columns=["Nota numérica"]),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            csv_validos = filtrado.drop(columns=["Nota numérica"]).to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Baixar registros filtrados em CSV",
+                data=csv_validos,
+                file_name="gamelyst_registros.csv",
+                mime="text/csv",
+            )
+
+        if invalidos:
+            st.subheader("Registros rejeitados")
+            st.dataframe(df_invalidos, use_container_width=True, hide_index=True)
+            csv_invalidos = df_invalidos.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Baixar relatório de rejeições em CSV",
+                data=csv_invalidos,
+                file_name="gamelyst_rejeicoes.csv",
+                mime="text/csv",
+            )
 
 with tab_afn:
-    st.subheader("Visualizador dos AFN-ε com Graphviz")
-    dot = graphviz.Digraph(comment="AFNe Plataforma")
-    dot.attr(rankdir="LR")
-    dot.node("q0", "q0 (Inicial)", shape="circle")
-    dot.node("qf", "qf (Final)", shape="doublecircle")
-    
-    for idx, plat in enumerate(["PC", "PS5", "iOS"], start=1):
-        dot.edge("q0", f"q_{idx}_1", label="ε")
-        dot.edge(f"q_{idx}_1", f"q_{idx}_2", label=plat)
-        dot.edge(f"q_{idx}_2", "qf", label="ε")
-        
-    st.graphviz_chart(dot)
+    st.subheader("AFNε das expressões")
+    st.caption(
+        "Nos diagramas, rótulos com vários símbolos separados por vírgula representam transições unitárias alternativas. "
+        "Na ER-01, B, A e X são abreviações de conjuntos finitos descritos na legenda do próprio diagrama."
+    )
+    automato_nome = st.selectbox("Expressão", list(AUTOMATA_BUILDERS.keys()))
+    st.graphviz_chart(get_automaton(automato_nome), use_container_width=True)
 
 with tab_docs:
-    st.subheader("Fichas de Notação Formal")
-    st.markdown(r"""
-    # Definições utilizadas na notação formal
+    st.subheader("Padrões implementados")
+    tabela = pd.DataFrame(
+        [
+            {
+                "ID": PATTERN_IDS[chave],
+                "Nome": PATTERN_NAMES[chave],
+                "Sintaxe usada no código": PATTERNS[chave],
+            }
+            for chave in PATTERNS
+        ]
+    )
+    st.dataframe(tabela, use_container_width=True, hide_index=True)
 
-    Para manter a equivalência entre a linguagem formal e as expressões implementadas no Python, são usadas as seguintes definições:
-
-    - $D = \{0,1,2,3,4,5,6,7,8,9\}$.
-    - $L = \{A,\ldots,Z,a,\ldots,z\} \cup \{c \mid U+00C0 \leq c \leq U+00FF,\ c \neq U+00D7,\ c \neq U+00F7\}$, exatamente correspondente ao conjunto de caracteres usado por `\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF` no código (o intervalo `U+00C0` a `U+00FF` sem os símbolos "×" e "÷").
-    - $S = \{\text{espaço}, :, -, ', !\}$.
-    - $P = \{PC, PS1, PS2, PS3, PS4, PS5, \text{Xbox One}, \text{Xbox Series X/S}, \text{Nintendo Switch}, \text{Android}, iOS\}$.
-    - $G = \{RPG, Acão, Aventura, Estratégia, Esportes, Simulacão, Terror, Puzzle, Luta\}$.
-    - O símbolo `.` na ER-05 representa o **ponto literal** (e não o operador “qualquer caractere”); na notação formal, ele é simplesmente o símbolo `.`.
-    - Em todas as expressões formais, a união é escrita com $\cup$, a concatenação é a justaposição e $^*$ é o fecho de Kleene.
-
-    # Fichas resumidas das Expressões Regulares
-
-    | ID | Nome | Descrição da linguagem | Expressão Regular formal | Sintaxe Python |
-    |---|---|---|---|---|
-    | **ER-01** | Título | Cadeias não vazias que começam com uma letra (incluindo acentuadas, exceto × e ÷) ou um dígito, seguidos de zero ou mais letras, dígitos, espaços, `:`, `-`, `'` ou `!`. | $(L \cup D)(L \cup D \cup S)^*$ | `^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF][a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\ \:\-\'\!]*$` |
-    | **ER-02** | Plataforma | Exatamente um nome de plataforma da lista permitida: PC, PS1 a PS5, Xbox One, Xbox Series X/S, Nintendo Switch, Android ou iOS (com essa grafia). | $PC \cup PS1 \cup PS2 \cup PS3 \cup PS4 \cup PS5 \cup \text{Xbox One} \cup \text{Xbox Series X/S} \cup \text{Nintendo Switch} \cup \text{Android} \cup iOS$ | `^(PC\|PS1\|PS2\|PS3\|PS4\|PS5\|Xbox One\|Xbox Series X/S\|Nintendo Switch\|Android\|iOS)$` |
-    | **ER-03** | Ano | Anos de quatro dígitos entre 1950 e 2029: `19` seguido de um dígito de 5 a 9 e de mais um dígito, ou `20` seguido de um dígito de 0 a 2 e de mais um dígito. | $19(5 \cup 6 \cup 7 \cup 8 \cup 9)D \cup 20(0 \cup 1 \cup 2)D$ | `^(19[5-9]\d\|20[0-2]\d)$` |
-    | **ER-04** | Gênero | Exatamente um nome de gênero da lista permitida: RPG, Ação, Aventura, Estratégia, Esportes, Simulação, Terror, Puzzle ou Luta (com essa grafia). | $RPG \cup Ação \cup Aventura \cup Estratégia \cup Esportes \cup Simulação \cup Terror \cup Puzzle \cup Luta$ | `^(RPG\|Ação\|Aventura\|Estratégia\|Esportes\|Simulação\|Terror\|Puzzle\|Luta)$` |
-    | **ER-05** | Nota | Nota de 0 a 10 seguida de `/10`: o inteiro 10 (opcionalmente `10.0`) ou um dígito de 0 a 9 (opcionalmente com uma casa decimal, ex.: `8.5`). | $(10(.0 \cup \epsilon) \cup D(.D \cup \epsilon))/10$ | `^(10(\.0)?\|[0-9](\.[0-9])?)\/10$` |
-    """)
+    if DOCS_FILE.exists():
+        st.markdown(DOCS_FILE.read_text(encoding="utf-8"))
+    else:
+        st.warning("A documentação detalhada das expressões não foi encontrada.")

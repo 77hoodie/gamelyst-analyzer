@@ -1,0 +1,26 @@
+digraph "ER-05 — Nota" {
+	fontsize=18 label="ER-05 — Nota" labelloc=t rankdir=LR
+	node [fontname=Arial]
+	edge [fontname=Arial]
+	inicio [label="" shape=point]
+	q0 [label=q0]
+	n [label=n]
+	qf [label=qf shape=doublecircle]
+	inicio -> q0
+	q0 -> a0 [label="ε"]
+	a0 -> a1 [label=1]
+	a1 -> a2 [label=0]
+	a2 -> n [label="ε"]
+	a2 -> a3 [label="."]
+	a3 -> n [label=0]
+	q0 -> b0 [label="ε"]
+	b0 -> b1 [label="0,1,2,3,4,5,6,7,8,9"]
+	b1 -> n [label="ε"]
+	b1 -> b2 [label="."]
+	b2 -> n [label="0,1,2,3,4,5,6,7,8,9"]
+	n -> s1 [label="/"]
+	s1 -> s2 [label=1]
+	s2 -> qf [label=0]
+	node [shape=note]
+	legenda [label="Rótulos separados por vírgula representam transições unitárias alternativas."]
+}
