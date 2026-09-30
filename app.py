@@ -4,7 +4,8 @@ import pandas as pd
 import streamlit as st
 import graphviz
 
-# Dicionário de Expressões Regulares com suporte completo a acentos Unicode (\u00C0-\u00FF)
+#Dicionário de Expressões Regulares com suporte completo a acentos Unicode (\u00C0-\u00FF)
+
 PATTERNS = {
     "TITULO": r"^[a-zA-Z0-9\u00C0-\u00FF][a-zA-Z0-9\u00C0-\u00FF\ \:\-\'\!]*$",
     "PLATAFORMA": r"^(PC|PS1|PS2|PS3|PS4|PS5|Xbox One|Xbox Series X/S|Nintendo Switch|Android|iOS)$",
@@ -15,10 +16,10 @@ PATTERNS = {
 
 st.set_page_config(page_title="GameCatalog Parser", page_icon="🎮", layout="wide")
 
-st.title("🎮 GameCatalog Lexer & Parser")
+st.title("GameCatalog Lexer & Parser")
 st.markdown("Validação léxica de catálogo de jogos via Expressões Regulares.")
 
-tab_app, tab_afn, tab_docs = st.tabs(["🚀 Processador de Dados", "🕸️ Diagramas AFN-ε (Graphviz)", "📜 Fichas das Expressões"])
+tab_app, tab_afn, tab_docs = st.tabs(["Processador de Dados", "Diagramas AFN-ε (Graphviz)", "Fichas das Expressões"])
 
 def validar_campo(valor: str, chave: str) -> bool:
     if not valor:
@@ -107,8 +108,8 @@ with tab_app:
         col1, col2, col3 = st.columns(3)
         total = len(df_validos) + len(df_invalidos)
         col1.metric("Total de Linhas Analisadas", total)
-        col2.metric("Registros Válidos ✅", len(df_validos))
-        col3.metric("Registros Inválidos ❌", len(df_invalidos))
+        col2.metric("Registros Válidos", len(df_validos))
+        col3.metric("Registros Inválidos", len(df_invalidos))
 
         st.divider()
 
@@ -117,7 +118,7 @@ with tab_app:
             st.dataframe(df_validos, use_container_width=True)
 
         if not df_invalidos.empty:
-            st.subheader("❌ Registros Corrompidos / Rejeitados")
+            st.subheader("Registros Corrompidos / Rejeitados")
             st.dataframe(df_invalidos, use_container_width=True)
 
 with tab_afn:
@@ -136,12 +137,25 @@ with tab_afn:
 
 with tab_docs:
     st.subheader("Fichas de Notação Formal")
-    st.markdown("""
-    | ID | Nome | Notação Formal | Sintaxe Python |
-    |---|---|---|---|
-    | **ER-01** | Título | $(L \cup D)(L \cup D \cup S)^*$ | `^[a-zA-Z0-9\u00C0-\u00FF][a-zA-Z0-9\u00C0-\u00FF\ \:\-\'\!]*$` |
-    | **ER-02** | Plataforma | $(\text{PC} \cup \text{PS5} \cup \dots)$ | `^(PC\|PS1\|PS2\|...)$` |
-    | **ER-03** | Ano | $(19 D_5 D \cup 20 D_2 D)$ | `^(19[5-9]\d\|20[0-2]\d)$` |
-    | **ER-04** | Gênero | $(\text{RPG} \cup \text{Ação} \cup \dots)$ | `^(RPG\|Ação\|Aventura\|...)$` |
-    | **ER-05** | Nota | $((10(.0 \cup \epsilon) \cup D(.D \cup \epsilon))/10)$ | `^(10(\.0)?\|[0-9](\.[0-9])?)\/10$` |
+    st.markdown(r"""
+    #Definições utilizadas na notação formal
+
+    Para manter a equivalência entre a linguagem formal e as expressões implementadas no Python, são usadas as seguintes definições:
+
+    - $D = \{0,1,2,3,4,5,6,7,8,9\}$.
+    - $A = \{A,\ldots,Z,a,\ldots,z\} \cup \{c \mid U+00C0 \leq c \leq U+00FF\}$, exatamente correspondente ao intervalo de caracteres utilizado por `\u00C0-\u00FF` no código.
+    - $S = \{\text{espaço}, :, -, ', !\}$.
+    - $P = \{PC, PS1, PS2, PS3, PS4, PS5, \text{Xbox One}, \text{Xbox Series X/S}, \text{Nintendo Switch}, \text{Android}, iOS\}$.
+    - $G = \{RPG, Ação, Aventura, Estratégia, Esportes, Simulação, Terror, Puzzle, Luta\}$.
+    - O símbolo `.` na ER-05 representa o **ponto literal** (e não o operador “qualquer caractere”); na notação formal, ele é simplesmente o símbolo `.`.
+
+    #Fichas resumidas das Expressões Regulares
+
+    | ID | Nome | Linguagem formal | Expressão Regular formal | Sintaxe Python |
+    |---|---|---|---|---|
+    | **ER-01** | Título | $L_{01}= (A \cup D)(A \cup D \cup S)^*$ | $(A \cup D)(A \cup D \cup S)^*$ | `^[a-zA-Z0-9\u00C0-\u00FF][a-zA-Z0-9\u00C0-\u00FF\ \:\-\'\!]*$` |
+    | **ER-02** | Plataforma | $L_{02}=P$ | $PC \mid PS1 \mid PS2 \mid PS3 \mid PS4 \mid PS5 \mid \text{Xbox One} \mid \text{Xbox Series X/S} \mid \text{Nintendo Switch} \mid \text{Android} \mid iOS$ | `^(PC\|PS1\|PS2\|PS3\|PS4\|PS5\|Xbox One\|Xbox Series X/S\|Nintendo Switch\|Android\|iOS)$` |
+    | **ER-03** | Ano | $L_{03}=19(5\mid6\mid7\mid8\mid9)D \cup 20(0\mid1\mid2)D$ | $19(5\mid6\mid7\mid8\mid9)D \mid 20(0\mid1\mid2)D$ | `^(19[5-9]\d\|20[0-2]\d)$` |
+    | **ER-04** | Gênero | $L_{04}=G$ | $RPG \mid Ação \mid Aventura \mid Estratégia \mid Esportes \mid Simulação \mid Terror \mid Puzzle \mid Luta$ | `^(RPG\|Ação\|Aventura\|Estratégia\|Esportes\|Simulação\|Terror\|Puzzle\|Luta)$` |
+    | **ER-05** | Nota | $L_{05}= (10(.0 \mid \epsilon) \mid D(.D \mid \epsilon))/10$ | $(10(.0 \mid \epsilon) \mid D(.D \mid \epsilon))/10$ | `^(10(\.0)?\|[0-9](\.[0-9])?)\/10$` |
     """)
