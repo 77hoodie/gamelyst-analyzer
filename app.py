@@ -4,10 +4,10 @@ import pandas as pd
 import streamlit as st
 import graphviz
 
-#Dicionário de Expressões Regulares com suporte completo a acentos Unicode (\u00C0-\u00FF)
+#Dicionário de Expressões Regulares com suporte a acentos Unicode (\u00C0-\u00FF, exceto "×" e "÷")
 
 PATTERNS = {
-    "TITULO": r"^[a-zA-Z0-9\u00C0-\u00FF][a-zA-Z0-9\u00C0-\u00FF\ \:\-\'\!]*$",
+    "TITULO": r"^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF][a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\ \:\-\'\!]*$",
     "PLATAFORMA": r"^(PC|PS1|PS2|PS3|PS4|PS5|Xbox One|Xbox Series X/S|Nintendo Switch|Android|iOS)$",
     "ANO": r"^(19[5-9]\d|20[0-2]\d)$",
     "GENERO": r"^(RPG|Ação|Aventura|Estratégia|Esportes|Simulação|Terror|Puzzle|Luta)$",
@@ -114,7 +114,7 @@ with tab_app:
         st.divider()
 
         if not df_validos.empty:
-            st.subheader("✅ Catálogo de Jogos Reconhecidos")
+            st.subheader("Catálogo de Jogos Reconhecidos")
             st.dataframe(df_validos, use_container_width=True)
 
         if not df_invalidos.empty:
@@ -138,24 +138,25 @@ with tab_afn:
 with tab_docs:
     st.subheader("Fichas de Notação Formal")
     st.markdown(r"""
-    #Definições utilizadas na notação formal
+    # Definições utilizadas na notação formal
 
     Para manter a equivalência entre a linguagem formal e as expressões implementadas no Python, são usadas as seguintes definições:
 
     - $D = \{0,1,2,3,4,5,6,7,8,9\}$.
-    - $A = \{A,\ldots,Z,a,\ldots,z\} \cup \{c \mid U+00C0 \leq c \leq U+00FF\}$, exatamente correspondente ao intervalo de caracteres utilizado por `\u00C0-\u00FF` no código.
+    - $L = \{A,\ldots,Z,a,\ldots,z\} \cup \{c \mid U+00C0 \leq c \leq U+00FF,\ c \neq U+00D7,\ c \neq U+00F7\}$, exatamente correspondente ao conjunto de caracteres usado por `\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF` no código (o intervalo `U+00C0` a `U+00FF` sem os símbolos "×" e "÷").
     - $S = \{\text{espaço}, :, -, ', !\}$.
     - $P = \{PC, PS1, PS2, PS3, PS4, PS5, \text{Xbox One}, \text{Xbox Series X/S}, \text{Nintendo Switch}, \text{Android}, iOS\}$.
-    - $G = \{RPG, Ação, Aventura, Estratégia, Esportes, Simulação, Terror, Puzzle, Luta\}$.
+    - $G = \{RPG, Acão, Aventura, Estratégia, Esportes, Simulacão, Terror, Puzzle, Luta\}$.
     - O símbolo `.` na ER-05 representa o **ponto literal** (e não o operador “qualquer caractere”); na notação formal, ele é simplesmente o símbolo `.`.
+    - Em todas as expressões formais, a união é escrita com $\cup$, a concatenação é a justaposição e $^*$ é o fecho de Kleene.
 
-    #Fichas resumidas das Expressões Regulares
+    # Fichas resumidas das Expressões Regulares
 
-    | ID | Nome | Linguagem formal | Expressão Regular formal | Sintaxe Python |
+    | ID | Nome | Descrição da linguagem | Expressão Regular formal | Sintaxe Python |
     |---|---|---|---|---|
-    | **ER-01** | Título | $L_{01}= (A \cup D)(A \cup D \cup S)^*$ | $(A \cup D)(A \cup D \cup S)^*$ | `^[a-zA-Z0-9\u00C0-\u00FF][a-zA-Z0-9\u00C0-\u00FF\ \:\-\'\!]*$` |
-    | **ER-02** | Plataforma | $L_{02}=P$ | $PC \mid PS1 \mid PS2 \mid PS3 \mid PS4 \mid PS5 \mid \text{Xbox One} \mid \text{Xbox Series X/S} \mid \text{Nintendo Switch} \mid \text{Android} \mid iOS$ | `^(PC\|PS1\|PS2\|PS3\|PS4\|PS5\|Xbox One\|Xbox Series X/S\|Nintendo Switch\|Android\|iOS)$` |
-    | **ER-03** | Ano | $L_{03}=19(5\mid6\mid7\mid8\mid9)D \cup 20(0\mid1\mid2)D$ | $19(5\mid6\mid7\mid8\mid9)D \mid 20(0\mid1\mid2)D$ | `^(19[5-9]\d\|20[0-2]\d)$` |
-    | **ER-04** | Gênero | $L_{04}=G$ | $RPG \mid Ação \mid Aventura \mid Estratégia \mid Esportes \mid Simulação \mid Terror \mid Puzzle \mid Luta$ | `^(RPG\|Ação\|Aventura\|Estratégia\|Esportes\|Simulação\|Terror\|Puzzle\|Luta)$` |
-    | **ER-05** | Nota | $L_{05}= (10(.0 \mid \epsilon) \mid D(.D \mid \epsilon))/10$ | $(10(.0 \mid \epsilon) \mid D(.D \mid \epsilon))/10$ | `^(10(\.0)?\|[0-9](\.[0-9])?)\/10$` |
+    | **ER-01** | Título | Cadeias não vazias que começam com uma letra (incluindo acentuadas, exceto × e ÷) ou um dígito, seguidos de zero ou mais letras, dígitos, espaços, `:`, `-`, `'` ou `!`. | $(L \cup D)(L \cup D \cup S)^*$ | `^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF][a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\ \:\-\'\!]*$` |
+    | **ER-02** | Plataforma | Exatamente um nome de plataforma da lista permitida: PC, PS1 a PS5, Xbox One, Xbox Series X/S, Nintendo Switch, Android ou iOS (com essa grafia). | $PC \cup PS1 \cup PS2 \cup PS3 \cup PS4 \cup PS5 \cup \text{Xbox One} \cup \text{Xbox Series X/S} \cup \text{Nintendo Switch} \cup \text{Android} \cup iOS$ | `^(PC\|PS1\|PS2\|PS3\|PS4\|PS5\|Xbox One\|Xbox Series X/S\|Nintendo Switch\|Android\|iOS)$` |
+    | **ER-03** | Ano | Anos de quatro dígitos entre 1950 e 2029: `19` seguido de um dígito de 5 a 9 e de mais um dígito, ou `20` seguido de um dígito de 0 a 2 e de mais um dígito. | $19(5 \cup 6 \cup 7 \cup 8 \cup 9)D \cup 20(0 \cup 1 \cup 2)D$ | `^(19[5-9]\d\|20[0-2]\d)$` |
+    | **ER-04** | Gênero | Exatamente um nome de gênero da lista permitida: RPG, Ação, Aventura, Estratégia, Esportes, Simulação, Terror, Puzzle ou Luta (com essa grafia). | $RPG \cup Ação \cup Aventura \cup Estratégia \cup Esportes \cup Simulação \cup Terror \cup Puzzle \cup Luta$ | `^(RPG\|Ação\|Aventura\|Estratégia\|Esportes\|Simulação\|Terror\|Puzzle\|Luta)$` |
+    | **ER-05** | Nota | Nota de 0 a 10 seguida de `/10`: o inteiro 10 (opcionalmente `10.0`) ou um dígito de 0 a 9 (opcionalmente com uma casa decimal, ex.: `8.5`). | $(10(.0 \cup \epsilon) \cup D(.D \cup \epsilon))/10$ | `^(10(\.0)?\|[0-9](\.[0-9])?)\/10$` |
     """)

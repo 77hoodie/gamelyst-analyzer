@@ -2,7 +2,7 @@ import re
 import pytest
 
 PATTERNS = {
-    "ER-01": r"^[a-zA-Z0-9\u00C0-\u00FF][a-zA-Z0-9\u00C0-\u00FF\ \:\-\'\!]*$",
+    "ER-01": r"^[a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF][a-zA-Z0-9\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\ \:\-\'\!]*$",
     "ER-02": r"^(PC|PS1|PS2|PS3|PS4|PS5|Xbox One|Xbox Series X/S|Nintendo Switch|Android|iOS)$",
     "ER-03": r"^(19[5-9]\d|20[0-2]\d)$",
     "ER-04": r"^(RPG|Ação|Aventura|Estratégia|Esportes|Simulação|Terror|Puzzle|Luta)$",
