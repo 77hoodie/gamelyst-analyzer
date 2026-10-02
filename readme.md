@@ -244,10 +244,10 @@ Nos diagramas:
 
 | Integrante | Nome completo |
 |---|---|
-| 1 | ______________________________________________ |
-| 2 | ______________________________________________ |
-| 3 | ______________________________________________ |
-| 4 | ______________________________________________ |
+| 1 | João Pedro Almeida Follmann |
+| 2 | Samuel Paula Nunes Salheb |
+| 3 | Yuri Antonio Santos Fernandes |
+| 4 | Arthur José Aviz Lima |
 
 ---
 
